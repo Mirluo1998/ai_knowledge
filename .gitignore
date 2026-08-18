@@ -1,0 +1,27 @@
+# 编译产物
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 测试与覆盖率产物
+*.out
+*.test
+coverage.html
+
+# Go workspace
+go.work
+go.work.sum
+
+# 环境变量文件（可能包含密钥，禁止入库）
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+
+# 本地工具配置
+.claude/
