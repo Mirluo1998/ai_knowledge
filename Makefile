@@ -9,9 +9,17 @@ all: fmt vet test build
 build:
 	go build -o $(BIN_DIR)/$(APP_NAME) ./cmd/server
 
-## run: 本地启动服务
+## run: 本地启动服务（默认 development 环境）
 run:
 	go run ./cmd/server
+
+## run-prod: 以 production 环境配置启动服务
+run-prod:
+	APP_ENV=production go run ./cmd/server
+
+## run-staging: 以 staging 环境配置启动服务
+run-staging:
+	APP_ENV=staging go run ./cmd/server
 
 ## test: 运行全部单元测试（带竞态检测）
 test:

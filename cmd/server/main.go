@@ -29,11 +29,11 @@ func main() {
 // run 执行完整的服务生命周期，返回进程退出码。
 // 拆出 run 而不是把所有逻辑塞进 main，便于测试与 defer 管理。
 func run() int {
-	// 生产环境使用 JSON 格式的结构化日志，方便日志采集系统解析。
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	slog.SetDefault(logger)
-
 	cfg := config.Load()
+
+	// 根据配置初始化日志：开发环境用 text 方便阅读，生产环境用 json 方便采集。
+	logger := newLogger(cfg)
+	slog.SetDefault(logger)
 
 	db, err := initDB(cfg)
 	if err != nil {
@@ -118,11 +118,38 @@ func newRouter(cfg config.Config, db *sql.DB, logger *slog.Logger) http.Handler 
 
 	// 业务路由：Go 1.22+ 的 ServeMux 支持方法匹配。
 	mux.HandleFunc("GET /api/v1/knowledge", knowledgeHandler.ListKnowledge)
+	mux.HandleFunc("PUT /api/v1/knowledge", knowledgeHandler.CreateKnowledge)
 
 	return middleware.Chain(mux,
 		middleware.Recover(logger),
 		middleware.AccessLog(logger),
 	)
+}
+
+// newLogger 根据配置创建日志器。
+func newLogger(cfg config.Config) *slog.Logger {
+	var level slog.Level
+	switch cfg.LogLevel {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn", "warning":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+
+	opts := &slog.HandlerOptions{Level: level}
+
+	var handler slog.Handler
+	if cfg.LogFormat == "text" {
+		handler = slog.NewTextHandler(os.Stdout, opts)
+	} else {
+		handler = slog.NewJSONHandler(os.Stdout, opts)
+	}
+
+	return slog.New(handler)
 }
 
 // healthz 返回服务与数据库的健康状态。

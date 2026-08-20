@@ -12,6 +12,7 @@ import (
 // 接口定义在消费方，使 service 可以脱离具体数据库实现进行单元测试。
 type KnowledgeRepository interface {
 	List(ctx context.Context, query model.KnowledgeQuery) ([]model.Knowledge, error)
+	Create(ctx context.Context, knowledge model.Knowledge) (int32, error)
 }
 
 // KnowledgeService 负责知识条目相关的业务逻辑。
@@ -35,4 +36,12 @@ func (s *KnowledgeService) ListKnowledge(ctx context.Context, query model.Knowle
 		return nil, fmt.Errorf("list knowledge: %w", err)
 	}
 	return items, nil
+}
+
+func (s *KnowledgeService) CreateKnowledge(ctx context.Context, knowledge model.Knowledge) (int32, error) {
+	rw, err := s.repo.Create(ctx, knowledge)
+	if err != nil {
+		return 0, fmt.Errorf("create knowledge: %w", err)
+	}
+	return rw, nil
 }

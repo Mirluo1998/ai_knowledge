@@ -31,7 +31,7 @@ func (r *knowledgeRepository) List(ctx context.Context, query model.KnowledgeQue
 
 	// 显式列出字段，避免 SELECT * 带来的隐式耦合。
 	sb.WriteString("SELECT id, type, title, content, created_at, updated_at FROM knowledge WHERE 1 = 1")
-	if query.Type != "" {
+	if query.Type != 0 {
 		sb.WriteString(" AND type = ?")
 		args = append(args, query.Type)
 	}
@@ -60,4 +60,19 @@ func (r *knowledgeRepository) List(ctx context.Context, query model.KnowledgeQue
 	}
 
 	return items, nil
+}
+
+func (r *knowledgeRepository) Create(ctx context.Context, knowledge model.Knowledge) (int32, error) {
+	var (
+		sb   strings.Builder
+		args []any
+	)
+
+	sb.WriteString("INSERT INTO knowledge (type, title, content) VALUES (?, ?, ?)")
+	args = append(args, knowledge.Type, knowledge.Title, knowledge.Content)
+	_, err := r.db.ExecContext(ctx, sb.String(), args...)
+	if err != nil {
+		return 0, fmt.Errorf("insert knowledge: %w", err)
+	}
+	return 1, nil
 }
