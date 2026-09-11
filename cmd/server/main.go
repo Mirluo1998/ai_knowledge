@@ -109,7 +109,11 @@ func newRouter(cfg config.Config, db *sql.DB, logger *slog.Logger) http.Handler 
 	// 依赖注入：repository -> service -> handler，方向单一、便于替换与测试。
 	knowledgeRepo := repository.NewKnowledgeRepository(db)
 	knowledgeSvc := service.NewKnowledgeService(knowledgeRepo)
+	userRepo := repository.NewUserRepository(db)
+	userSvc := service.NewUserService(userRepo, logger)
+
 	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeSvc, logger)
+	userHandler := handler.NewUserHandler(logger, userSvc)
 
 	mux := http.NewServeMux()
 
@@ -119,6 +123,9 @@ func newRouter(cfg config.Config, db *sql.DB, logger *slog.Logger) http.Handler 
 	// 业务路由：Go 1.22+ 的 ServeMux 支持方法匹配。
 	mux.HandleFunc("GET /api/v1/knowledge", knowledgeHandler.ListKnowledge)
 	mux.HandleFunc("PUT /api/v1/knowledge", knowledgeHandler.CreateKnowledge)
+	mux.HandleFunc("POST /api/v1/user/register", userHandler.Register)
+	mux.HandleFunc("GET /api/v1/user/get", userHandler.GetUser)
+	mux.HandleFunc("POST /api/v1/user/login", userHandler.Login)
 
 	return middleware.Chain(mux,
 		middleware.Recover(logger),
