@@ -26,22 +26,26 @@ func (f *fakeRepository) List(ctx context.Context, query model.KnowledgeQuery) (
 	return f.items, f.err
 }
 
+func (f *fakeRepository) Create(ctx context.Context, knowledge model.Knowledge) (int32, error) {
+	return 1, f.err
+}
+
 func TestListKnowledge(t *testing.T) {
 	repo := &fakeRepository{items: []model.Knowledge{
-		{ID: 1, Type: "faq", Title: "部署流程"},
-		{ID: 2, Type: "faq", Title: "发布规范"},
+		{ID: 1, Type: 1, Title: "部署流程"},
+		{ID: 2, Type: 1, Title: "发布规范"},
 	}}
 	svc := service.NewKnowledgeService(repo)
 
 	ctx := context.WithValue(context.Background(), "trace-id", "abc") //nolint:staticcheck // 仅用于验证 context 透传
-	items, err := svc.ListKnowledge(ctx, model.KnowledgeQuery{Type: "faq"})
+	items, err := svc.ListKnowledge(ctx, model.KnowledgeQuery{Type: 1})
 	if err != nil {
 		t.Fatalf("ListKnowledge returned error: %v", err)
 	}
 	if len(items) != 2 {
 		t.Fatalf("expected 2 items, got %d", len(items))
 	}
-	if repo.gotQuery.Type != "faq" {
+	if repo.gotQuery.Type != 1 {
 		t.Errorf("query not passed through, got %+v", repo.gotQuery)
 	}
 	if repo.gotCtx != ctx {

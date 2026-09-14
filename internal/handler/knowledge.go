@@ -2,9 +2,7 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -58,19 +56,18 @@ func (h *KnowledgeHandler) ListKnowledge(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *KnowledgeHandler) CreateKnowledge(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return
-	}
 	var knowledge model.Knowledge
-
-	if err := json.Unmarshal(body, &knowledge); err != nil {
-		h.logger.Error("read request body failed", "error", err)
-		writeError(w, http.StatusBadRequest, "read request body failed")
+	if err := decodeJSONBody(w, r, &knowledge); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	_, err = h.svc.CreateKnowledge(r.Context(), knowledge)
+	_, err := h.svc.CreateKnowledge(r.Context(), knowledge)
 	if err != nil {
 		h.logger.Error("create knowledge failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")

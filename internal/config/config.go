@@ -49,6 +49,12 @@ type Config struct {
 	DBMaxIdleConns    int           `yaml:"database.max_idle_conns" env:"DB_MAX_IDLE_CONNS"`
 	DBConnMaxLifetime time.Duration `yaml:"database.conn_max_lifetime" env:"DB_CONN_MAX_LIFETIME"`
 
+	// Redis
+	RedisAddr     string        `yaml:"redis.addr" env:"REDIS_ADDR"`
+	RedisPassword string        `yaml:"redis.password" env:"REDIS_PASSWORD"`
+	RedisDB       int           `yaml:"redis.db" env:"REDIS_DB"`
+	SessionTTL    time.Duration `yaml:"redis.session_ttl" env:"SESSION_TTL"`
+
 	// Log
 	LogLevel  string `yaml:"log.level" env:"LOG_LEVEL"`
 	LogFormat string `yaml:"log.format" env:"LOG_FORMAT"`
@@ -106,6 +112,10 @@ func defaults() Config {
 		DBMaxOpenConns:    25,
 		DBMaxIdleConns:    10,
 		DBConnMaxLifetime: 5 * time.Minute,
+
+		RedisAddr:  "127.0.0.1:6379",
+		RedisDB:    0,
+		SessionTTL: 24 * time.Hour,
 
 		LogLevel:  "info",
 		LogFormat: "json",

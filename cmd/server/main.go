@@ -14,7 +14,9 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql" // 注册 MySQL 驱动
+	"github.com/redis/go-redis/v9"
 
+	"knowledge/internal/cache"
 	"knowledge/internal/config"
 	"knowledge/internal/handler"
 	"knowledge/internal/middleware"
@@ -42,7 +44,18 @@ func run() int {
 	}
 	defer db.Close()
 
-	mux := newRouter(cfg, db, logger)
+	redisClient, err := initRedis(cfg)
+	if err != nil {
+		logger.Error("init redis failed", "error", err)
+		return 1
+	}
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			logger.Warn("close redis client failed", "error", err)
+		}
+	}()
+
+	mux := newRouter(cfg, db, redisClient, logger)
 
 	srv := &http.Server{
 		Addr:              cfg.ServerAddr,
@@ -104,28 +117,55 @@ func initDB(cfg config.Config) (*sql.DB, error) {
 	return db, nil
 }
 
-// newRouter 组装依赖并构建路由。
-func newRouter(cfg config.Config, db *sql.DB, logger *slog.Logger) http.Handler {
-	// 依赖注入：repository -> service -> handler，方向单一、便于替换与测试。
-	knowledgeRepo := repository.NewKnowledgeRepository(db)
-	knowledgeSvc := service.NewKnowledgeService(knowledgeRepo)
-	userRepo := repository.NewUserRepository(db)
-	userSvc := service.NewUserService(userRepo, logger)
+// initRedis 创建 Redis 客户端并验证连接可用。
+func initRedis(cfg config.Config) (*redis.Client, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+	})
 
+	// 启动时立即验证连接可用，快速失败。
+	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := client.Ping(pingCtx).Err(); err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	return client, nil
+}
+
+// newRouter 组装依赖并构建路由。
+func newRouter(cfg config.Config, db *sql.DB, redisClient *redis.Client, logger *slog.Logger) http.Handler {
+	// 依赖注入：repository/cache -> service -> handler，方向单一、便于替换与测试。
+	knowledgeSvc := service.NewKnowledgeService(repository.NewKnowledgeRepository(db))
+	userSvc := service.NewUserService(
+		repository.NewUserRepository(db, logger),
+		cache.NewRedisSessionStore(redisClient),
+		cfg.SessionTTL, logger,
+	)
 	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeSvc, logger)
 	userHandler := handler.NewUserHandler(logger, userSvc)
+	authHandler := handler.NewAuthHandler(userSvc, logger)
 
 	mux := http.NewServeMux()
 
-	// 健康检查：用于负载均衡 / 编排系统的存活与就绪探测。
-	mux.HandleFunc("GET /healthz", healthz(cfg, db))
+	// 路由分组：public 直接注册；protected 自动套上 Bearer token 校验（查 Redis 会话）。
+	public := mux.HandleFunc
+	requireAuth := middleware.Auth(userSvc, logger)
+	protected := func(pattern string, h http.HandlerFunc) {
+		mux.Handle(pattern, requireAuth(h))
+	}
 
-	// 业务路由：Go 1.22+ 的 ServeMux 支持方法匹配。
-	mux.HandleFunc("GET /api/v1/knowledge", knowledgeHandler.ListKnowledge)
-	mux.HandleFunc("PUT /api/v1/knowledge", knowledgeHandler.CreateKnowledge)
-	mux.HandleFunc("POST /api/v1/user/register", userHandler.Register)
-	mux.HandleFunc("GET /api/v1/user/get", userHandler.GetUser)
-	mux.HandleFunc("POST /api/v1/user/login", userHandler.Login)
+	// 公开路由：健康检查、注册、登录（Go 1.22+ ServeMux 支持方法匹配）。
+	public("GET /healthz", healthz(cfg, db))
+	public("POST /api/v1/user/register", userHandler.Register)
+	public("POST /api/v1/user/login", authHandler.Login)
+
+	// 受保护路由：必须携带有效的 Bearer token。
+	protected("GET /api/v1/knowledge", knowledgeHandler.ListKnowledge)
+	protected("PUT /api/v1/knowledge", knowledgeHandler.CreateKnowledge)
+	protected("GET /api/v1/user/get", userHandler.GetUser)
 
 	return middleware.Chain(mux,
 		middleware.Recover(logger),

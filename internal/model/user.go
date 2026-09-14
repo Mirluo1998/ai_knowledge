@@ -18,3 +18,8 @@ type UserQuery struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 }
+
+type AuthedUser struct {
+	*UserResponse
+	Token string `json:"token"`
+}

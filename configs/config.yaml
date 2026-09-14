@@ -20,6 +20,12 @@ development:
     max_idle_conns: 10
     conn_max_lifetime: "5m"
 
+  redis:
+    addr: "www.hiluo.top:6379"
+    password: "Lpf@123456"
+    db: 0
+    session_ttl: "24h"
+
   log:
     level: "debug"
     format: "text"
@@ -42,6 +48,12 @@ staging:
     max_idle_conns: 20
     conn_max_lifetime: "10m"
 
+  redis:
+    addr: "staging-redis:6379"
+    password: ""
+    db: 0
+    session_ttl: "24h"
+
   log:
     level: "info"
     format: "json"
@@ -63,6 +75,12 @@ production:
     max_open_conns: 100
     max_idle_conns: 30
     conn_max_lifetime: "15m"
+
+  redis:
+    addr: "prod-redis:6379"
+    password: ""
+    db: 0
+    session_ttl: "24h"
 
   log:
     level: "info"
