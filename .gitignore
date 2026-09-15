@@ -25,3 +25,7 @@ go.work.sum
 
 # 本地工具配置
 .claude/
+
+# 前端工程
+web/node_modules/
+web/dist/
